@@ -101,3 +101,19 @@ Official merchant integration প্রস্তুত হওয়ার পর pa
 ## ৯. মোবাইল/ডেস্কটপের যোগাযোগ নম্বর
 
 বর্তমানে site copy-তে `01332-002097` ব্যবহার করা হয়েছে।
+
+
+## ১০. Payment Popup confirmation fix
+
+Frontend প্রতিটি আবেদনের জন্য random `requestId` তৈরি করে। Backend সেই ID-টি Google Sheet-এর `Request ID` কলামে সংরক্ষণ করে। Frontend এরপর একই ID দিয়ে read-only JSONP status check করে। Sheet-এ ID পাওয়া গেলেই Payment Popup খোলে। ফলে Apps Script-এর sandbox iframe থেকে `postMessage` না এলেও Popup খোলার নিশ্চয়তা পাওয়া যায়।
+
+এই ফিচার চালু করতে নতুন Frontend এবং Backend দুটোই deploy করুন:
+
+1. Google Sheet-এর **Extensions → Apps Script** খুলুন।
+2. এই প্যাকেজের `backend/Code.gs` দিয়ে Apps Script-এর সম্পূর্ণ কোড replace করুন। নিজের `SPREADSHEET_ID`, `ADMIN_EMAIL` এবং email setting ঠিক রাখুন।
+3. Apps Script Editor-এ `setupSheet` ফাংশন একবার Run করুন। অনুমতি চাইলে অনুমোদন দিন। আগের আবেদন মুছবে না; শুধু প্রয়োজনীয় `Request ID` header যোগ করবে।
+4. **Deploy → Manage deployments → Edit → Version → New version → Deploy** করুন। পুরোনো deployment version চালু থাকলে status endpoint কাজ করবে না।
+5. নতুন ZIP-এর `app.js` ওয়েবসাইটে আপলোড করুন এবং `APPS_SCRIPT_URL`-এ একই `/exec` URL আছে কি না যাচাই করুন।
+6. সাইটে Ctrl+F5 দিয়ে refresh করে একটি নতুন test application দিন। Sheet-এর `Request ID` কলামে ID তৈরি হলে Popup স্বয়ংক্রিয়ভাবে খুলবে।
+
+**গুরুত্বপূর্ণ:** শুধু `app.js` পরিবর্তন করলে হবে না। নতুন `Code.gs` deploy না করলে `Request ID` status check-এ পাওয়া যাবে না। পরীক্ষা করার সময় প্রতিবার নতুন আবেদন তৈরি হতে পারে; আগে থেকে জমা থাকা আবেদন আবার submit করবেন না।

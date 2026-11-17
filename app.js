@@ -3,10 +3,9 @@
  * Never place payment-gateway secrets or private API keys in this file.
  */
 const SITE_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwzVivVbNCEGZBw5ty37LJ15j9AjleOXWHrhzNFrY8hicqb6RyUI4UuXCN6R2CD3DrT/exec",
-  PAYMENT_GATEWAY_READY: true // Set up an official merchant checkout + server verification before enabling.
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxugzQwXGqWnN8Szzu5HKqyye9KGHKSGc2ctDzqsybseMvLfj3WC4JiOr08DTxLlo7B/exec", // Example: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
+  PAYMENT_GATEWAY_READY: false // Set up an official merchant checkout + server verification before enabling.
 };
-
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const loanForm = $("#loanForm");
@@ -16,6 +15,19 @@ const backendFrame = $("#backendFrame");
 const backendPostForm = $("#backendPostForm");
 let waitingForBackend = false;
 let backendTimeout = null;
+let statusPollTimer = null;
+let activeStatusScript = null;
+let statusCallbackReceived = false;
+let activeRequestId = "";
+
+function createRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -106,6 +118,7 @@ function collectApplication() {
     loanAmount: Number(formData.get("loanAmount")),
     duration: Number(selectedValue("duration")),
     receiveMethod: selectedValue("receiveMethod"),
+    receiveNumber: toEnglishDigits(cleanText(formData.get("receiveNumber"))).replace(/[\s-]/g, ""),
     consent: Boolean(formData.get("consent")),
     source: "shohojcash.online",
     submittedAtClient: new Date().toISOString()
@@ -120,8 +133,92 @@ function validateApplication(data) {
   if (!allowedAmounts.includes(data.loanAmount)) return "সঠিক ঋণের পরিমাণ নির্বাচন করুন।";
   if (![3,6,12].includes(data.duration)) return "ঋণ পরিশোধের সময় নির্বাচন করুন।";
   if (!["bKash","Nagad"].includes(data.receiveMethod)) return "টাকা গ্রহণের মাধ্যম নির্বাচন করুন।";
+  if (!validBdPhone(data.receiveNumber)) return "টাকা গ্রহণের অ্যাকাউন্টের সঠিক মোবাইল নম্বর লিখুন।";
   if (!data.consent) return "তথ্য ব্যবহারের নীতিমালায় সম্মতি দিতে হবে।";
   return "";
+}
+
+function restoreSubmitButton() {
+  submitButton.disabled = false;
+  submitButton.innerHTML = 'আবেদন জমা দিন <span>→</span>';
+}
+
+function stopStatusPolling() {
+  if (statusPollTimer) window.clearTimeout(statusPollTimer);
+  statusPollTimer = null;
+  if (activeStatusScript) activeStatusScript.remove();
+  activeStatusScript = null;
+}
+
+function completeSuccessfulSubmission(result) {
+  if (!waitingForBackend || !activeRequestId) return;
+  if (result && result.requestId && result.requestId !== activeRequestId) return;
+
+  window.clearTimeout(backendTimeout);
+  stopStatusPolling();
+  waitingForBackend = false;
+  activeRequestId = "";
+  restoreSubmitButton();
+
+  showStatus("আপনার আবেদন জমা হয়েছে। নিচে আবেদন ফি-র পরবর্তী ধাপ দেখুন।", "success");
+  $("#applicationRef").textContent = `আবেদন নম্বর: ${(result && result.applicationId) || "জমা হয়েছে"}`;
+  openModal("paymentModal");
+}
+
+function completeFailedSubmission(message) {
+  if (!waitingForBackend) return;
+  window.clearTimeout(backendTimeout);
+  stopStatusPolling();
+  waitingForBackend = false;
+  activeRequestId = "";
+  restoreSubmitButton();
+  showStatus(message || "আবেদন জমা করা যায়নি। আবার চেষ্টা করার আগে Google Sheet পরীক্ষা করুন।", "error");
+}
+
+// Read-only JSONP polling avoids depending on postMessage crossing the Apps Script sandbox.
+window.shohojcashStatusCallback = function (result) {
+  if (!waitingForBackend || !activeRequestId || !result) return;
+  if (result.requestId !== activeRequestId) return;
+  statusCallbackReceived = true;
+
+  if (result.status === "saved" && result.ok === true) {
+    completeSuccessfulSubmission(result);
+    return;
+  }
+  const delay = result.status === "pending" ? 1800 : 3000;
+  statusPollTimer = window.setTimeout(() => pollApplicationStatus(activeRequestId), delay);
+};
+
+function pollApplicationStatus(requestId) {
+  if (!waitingForBackend || !requestId || requestId !== activeRequestId) return;
+  if (activeStatusScript) activeStatusScript.remove();
+
+  const script = document.createElement("script");
+  activeStatusScript = script;
+  statusCallbackReceived = false;
+  script.async = true;
+  script.src = `${SITE_CONFIG.APPS_SCRIPT_URL}?action=status&requestId=${encodeURIComponent(requestId)}&prefix=shohojcashStatusCallback&_=${Date.now()}`;
+  script.onload = () => {
+    window.setTimeout(() => {
+      if (activeStatusScript === script) {
+        script.remove();
+        activeStatusScript = null;
+      }
+      if (!statusCallbackReceived && waitingForBackend && activeRequestId === requestId) {
+        statusPollTimer = window.setTimeout(() => pollApplicationStatus(requestId), 3000);
+      }
+    }, 0);
+  };
+  script.onerror = () => {
+    if (activeStatusScript === script) {
+      script.remove();
+      activeStatusScript = null;
+    }
+    if (waitingForBackend && activeRequestId === requestId) {
+      statusPollTimer = window.setTimeout(() => pollApplicationStatus(requestId), 3000);
+    }
+  };
+  document.head.appendChild(script);
 }
 
 loanForm.addEventListener("submit", event => {
@@ -140,37 +237,37 @@ loanForm.addEventListener("submit", event => {
     return;
   }
   waitingForBackend = true;
+  activeRequestId = createRequestId();
+  $("#backendRequestId").value = activeRequestId;
   submitButton.disabled = true;
   submitButton.textContent = "জমা হচ্ছে...";
   showStatus("আপনার আবেদন নিরাপদে জমা দেওয়ার চেষ্টা চলছে...", "success");
   $("#backendPayload").value = JSON.stringify(data);
   backendPostForm.action = SITE_CONFIG.APPS_SCRIPT_URL;
   backendPostForm.submit();
+
+  // Poll the Sheet for this exact request. A pending result never opens payment.
+  statusPollTimer = window.setTimeout(() => pollApplicationStatus(activeRequestId), 1200);
+
   backendTimeout = window.setTimeout(() => {
     if (waitingForBackend) {
+      stopStatusPolling();
       waitingForBackend = false;
-      submitButton.disabled = false;
-      submitButton.innerHTML = 'আবেদন জমা দিন <span>→</span>';
-      showStatus("সার্ভার থেকে নিশ্চিতকরণ পাওয়া যায়নি। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন বা 01332-002097 নম্বরে যোগাযোগ করুন।", "error");
+      activeRequestId = "";
+      restoreSubmitButton();
+      showStatus("সার্ভারে আবেদন জমার নিশ্চিতকরণ পাওয়া যায়নি। আবেদনটি Sheet-এ থাকতে পারে—আবার জমা দেওয়ার আগে Sheet পরীক্ষা করুন বা 01332-002097 নম্বরে যোগাযোগ করুন।", "error");
     }
-  }, 25000);
+  }, 60000);
 });
 
 // Apps Script responds inside the hidden iframe and posts a result to this page.
 window.addEventListener("message", event => {
-  if (event.source !== backendFrame.contentWindow || !event.data || event.data.type !== "SHOHOJCASH_SUBMIT") return;
-  if (!waitingForBackend) return;
-  window.clearTimeout(backendTimeout);
-  waitingForBackend = false;
-  submitButton.disabled = false;
-  submitButton.innerHTML = 'আবেদন জমা দিন <span>→</span>';
-  if (event.data.ok) {
-    showStatus("আপনার আবেদন জমা হয়েছে। আবেদন নম্বরটি পেমেন্ট/পরবর্তী যোগাযোগের জন্য সংরক্ষণ করুন।", "success");
-    $("#applicationRef").textContent = `আবেদন নম্বর: ${event.data.applicationId || "জমা হয়েছে"}`;
-    openModal("paymentModal");
-  } else {
-    showStatus(event.data.message || "আবেদন জমা করা যায়নি। আবার চেষ্টা করুন।", "error");
-  }
+  // Fast-path response when the Apps Script sandbox allows the message through.
+  // JSONP Sheet-status polling remains the reliable fallback.
+  if (!event.data || event.data.type !== "SHOHOJCASH_SUBMIT") return;
+  if (!waitingForBackend || !activeRequestId || event.data.requestId !== activeRequestId) return;
+  if (event.data.ok) completeSuccessfulSubmission(event.data);
+  else completeFailedSubmission(event.data.message);
 });
 
 // Payment method selector. Actual checkout stays disabled until a verified merchant integration is installed.

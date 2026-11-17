@@ -174,6 +174,7 @@
               <label class="wallet-choice wallet-bkash"><input type="radio" name="receiveMethod" value="bKash" required><span class="wallet-logo">bKash</span><span>বিকাশ</span></label>
               <label class="wallet-choice wallet-nagad"><input type="radio" name="receiveMethod" value="Nagad"><span class="wallet-logo">নগদ</span><span>নগদ</span></label>
             </div>
+            <label class="field field-full receive-number-field"><span>অ্যাকাউন্টের মোবাইল নম্বর <i>*</i></span><input name="receiveNumber" type="tel" inputmode="tel" placeholder="01XXXXXXXXX" required maxlength="14"></label>
           </div>
 
           <div class="consent-box">
@@ -287,6 +288,7 @@
   <iframe name="backendFrame" id="backendFrame" title="আবেদন জমা" class="hidden-frame"></iframe>
   <form id="backendPostForm" method="post" target="backendFrame" class="hidden-frame">
     <input type="hidden" name="payload" id="backendPayload">
+    <input type="hidden" name="requestId" id="backendRequestId">
   </form>
 
   <script src="app.js" defer></script>

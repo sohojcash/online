@@ -8,10 +8,10 @@
  * - For production use, add CAPTCHA / rate limiting and complete a security review.
  */
 const CONFIG = {
-  SPREADSHEET_ID: 'PASTE_YOUR_GOOGLE_SHEET_ID_HERE',
+  SPREADSHEET_ID: '1uffjYzxqhDKZ8Lf9bEtHoyLZ13_iWglEd4pONho6ALM',
   SHEET_NAME: 'Loan Applications',
-  ADMIN_EMAIL: '', // Optional: admin email for new-application alerts.
-  SEND_EMAIL_ALERTS: false
+  ADMIN_EMAIL: 'briantregre4174@gmail.com', // Optional: admin email for new-application alerts.
+  SEND_EMAIL_ALERTS: true
 };
 
 const HEADERS = [
@@ -19,31 +19,35 @@ const HEADERS = [
   'Date of Birth', 'NID (Optional)', 'Division', 'District', 'Thana / Upazila',
   'Road / Village / Area', 'Applicant Phone', 'Loan Type', 'Loan Amount (BDT)',
   'Repayment Months', 'Receive Method', 'Receive Account', 'Consent',
-  'Consent Timestamp', 'Application Status', 'Fee Payment Status'
+  'Consent Timestamp', 'Application Status', 'Fee Payment Status', 'Request ID'
 ];
 
-function doGet() {
+function doGet(e) {
+  const params = (e && e.parameter) ? e.parameter : {};
+  if (String(params.action || '') === 'status') {
+    return jsonpStatus_(String(params.requestId || ''), String(params.prefix || ''));
+  }
   return HtmlService.createHtmlOutput(
     '<main style="font-family:Arial,sans-serif;padding:24px"><h2>Shohoj Cash application endpoint</h2><p>Endpoint is online. Use the website form to submit an application.</p></main>'
   ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/** Run once manually from the Apps Script editor to create the sheet header. */
+/** Run once manually from the Apps Script editor to create/migrate the sheet headers. */
 function setupSheet() {
   const ss = getSpreadsheet_();
   let sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
-    sheet.autoResizeColumns(1, HEADERS.length);
-  }
+  ensureHeaders_(sheet);
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight('bold');
+  sheet.autoResizeColumns(1, sheet.getLastColumn());
   return `Ready: ${ss.getUrl()}`;
 }
 
 function doPost(e) {
   let applicationId = '';
+  // Correlates this iframe response with the exact browser submission.
+  let requestId = (e && e.parameter) ? String(e.parameter.requestId || '') : '';
   try {
     if (!e || !e.parameter || !e.parameter.payload) {
       throw new Error('Missing payload');
@@ -78,22 +82,38 @@ function doPost(e) {
         'Yes',
         now,
         'Pending review',
-        'Not verified / pending'
+        'Not verified / pending',
+        safeCell_(requestId)
       ];
+      const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      // Map by header name so any extra columns already present in the user's Sheet stay intact.
+      const rowByHeader = headerRow.map(header => {
+        const index = HEADERS.indexOf(String(header).trim());
+        return index >= 0 ? row[index] : '';
+      });
       const nextRow = sheet.getLastRow() + 1;
-      sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
-      // Keep all applicant-provided values as text to avoid spreadsheet formula execution.
-      [3,4,5,6,7,8,9,10,11,12,13,16,17].forEach(col => sheet.getRange(nextRow, col).setNumberFormat('@'));
-      sheet.getRange(nextRow, 14, 1, 2).setNumberFormat('0');
+      sheet.getRange(nextRow, 1, 1, rowByHeader.length).setValues([rowByHeader]);
+
+      // Keep applicant-supplied strings and the request ID as text.
+      ['Applicant Name','Father Name','Mother Name','Date of Birth','NID (Optional)',
+       'Division','District','Thana / Upazila','Road / Village / Area','Applicant Phone',
+       'Loan Type','Receive Method','Receive Account','Request ID'].forEach(header => {
+        const column = headerRow.indexOf(header) + 1;
+        if (column > 0) sheet.getRange(nextRow, column).setNumberFormat('@');
+      });
+      ['Loan Amount (BDT)','Repayment Months'].forEach(header => {
+        const column = headerRow.indexOf(header) + 1;
+        if (column > 0) sheet.getRange(nextRow, column).setNumberFormat('0');
+      });
     } finally {
       lock.releaseLock();
     }
 
     sendAdminAlert_(data, applicationId);
-    return resultPage_({ ok: true, applicationId: applicationId });
+    return resultPage_({ ok: true, applicationId: applicationId, requestId: requestId });
   } catch (error) {
     console.error('Shohoj Cash submission error:', error && error.stack ? error.stack : error);
-    return resultPage_({ ok: false, message: 'তথ্য সংরক্ষণ করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা যোগাযোগ করুন।' });
+    return resultPage_({ ok: false, requestId: requestId, message: 'তথ্য সংরক্ষণ করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা যোগাযোগ করুন।' });
   }
 }
 
@@ -110,13 +130,73 @@ function getSpreadsheet_() {
 function getOrCreateSheet_() {
   const ss = getSpreadsheet_();
   let sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
-  }
+  if (!sheet) sheet = ss.insertSheet(CONFIG.SHEET_NAME);
+  ensureHeaders_(sheet);
   return sheet;
+}
+
+/** Add newly introduced columns to an existing sheet without moving old data. */
+function ensureHeaders_(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+    return;
+  }
+
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  const existing = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0].map(v => String(v).trim());
+  HEADERS.forEach(header => {
+    if (!existing.includes(header)) {
+      const newColumn = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColumn).setValue(header).setFontWeight('bold');
+      existing.push(header);
+    }
+  });
+}
+
+/** Public, read-only JSONP endpoint: exposes only whether a random request ID was saved. */
+function jsonpStatus_(requestId, callbackName) {
+  if (!/^[a-f0-9-]{16,64}$/i.test(requestId)) {
+    return ContentService.createTextOutput('/* invalid request */')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  if (!/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/.test(callbackName)) {
+    return ContentService.createTextOutput('/* invalid callback */')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  let result;
+  try {
+    const sheet = getOrCreateSheet_();
+    const lastRow = sheet.getLastRow();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    const requestColumn = headers.indexOf('Request ID') + 1;
+    const applicationColumn = headers.indexOf('Application ID') + 1;
+    if (lastRow < 2 || requestColumn < 1 || applicationColumn < 1) {
+      result = { ok: true, status: 'pending', requestId: requestId };
+    } else {
+      const match = sheet.getRange(2, requestColumn, lastRow - 1, 1)
+        .createTextFinder(requestId).matchEntireCell(true).findNext();
+      if (match) {
+        const applicationId = sheet.getRange(match.getRow(), applicationColumn).getDisplayValue();
+        result = { ok: true, status: 'saved', requestId: requestId, applicationId: applicationId };
+      } else {
+        result = { ok: true, status: 'pending', requestId: requestId };
+      }
+    }
+  } catch (error) {
+    console.error('Shohoj Cash status check error:', error);
+    result = { ok: false, status: 'retry', requestId: requestId };
+  }
+
+  const safeJson = JSON.stringify(result)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+  return ContentService.createTextOutput(callbackName + '(' + safeJson + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function validateApplication_(data) {
@@ -173,15 +253,33 @@ function sendAdminAlert_(data, applicationId) {
 }
 
 function resultPage_(result) {
-  const safeResult = JSON.stringify(result).replace(/</g, '\\u003c');
-  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body>
-    <script>
-      (function () {
-        var result = ${safeResult};
-        try { window.parent.postMessage(Object.assign({ type: 'SHOHOJCASH_SUBMIT' }, result), '*'); } catch (e) {}
-      })();
-    </script>
-    <p>Submission processed. You may return to the application page.</p>
-  </body></html>`;
-  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // Escape characters that could break the inline JavaScript response.
+  const safeResult = JSON.stringify(result)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
+  const html = `<!doctype html>
+    <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+    <body>
+      <script>
+        (function () {
+          var result = ${safeResult};
+          var message = Object.assign({ type: 'SHOHOJCASH_SUBMIT' }, result);
+          try {
+            // Use top so the message reaches the website even if Apps Script
+            // wraps its HTML response in an additional sandbox iframe.
+            window.top.postMessage(message, '*');
+          } catch (error) {
+            try { window.parent.postMessage(message, '*'); } catch (ignored) {}
+          }
+        })();
+      </script>
+      <p>Submission processed. You may return to the application page.</p>
+    </body></html>`;
+
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

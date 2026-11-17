@@ -30,12 +30,18 @@ function createRequestId() {
   return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function syncViewportHeight() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty("--app-vh", `${vh}px`);
+}
+
 function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.add("is-open");
   el.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
+  syncViewportHeight();
 }
 function closeModal(el) {
   const modal = typeof el === "string" ? document.getElementById(el) : el;
@@ -44,6 +50,10 @@ function closeModal(el) {
   modal.setAttribute("aria-hidden", "true");
   if (!$$(".modal-backdrop.is-open").length) document.body.classList.remove("modal-open");
 }
+
+window.addEventListener("resize", syncViewportHeight);
+window.addEventListener("orientationchange", syncViewportHeight);
+syncViewportHeight();
 
 // Mobile navigation
 $("#menuToggle").addEventListener("click", () => {

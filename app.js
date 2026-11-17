@@ -6,6 +6,7 @@ const SITE_CONFIG = {
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxugzQwXGqWnN8Szzu5HKqyye9KGHKSGc2ctDzqsybseMvLfj3WC4JiOr08DTxLlo7B/exec", // Example: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
   PAYMENT_GATEWAY_READY: true // Set up an official merchant checkout + server verification before enabling.
 };
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const loanForm = $("#loanForm");
@@ -117,7 +118,6 @@ function collectApplication() {
     loanType: selectedValue("loanType"),
     loanAmount: Number(formData.get("loanAmount")),
     duration: Number(selectedValue("duration")),
-    receiveMethod: selectedValue("receiveMethod"),
     consent: Boolean(formData.get("consent")),
     source: "shohojcash.online",
     submittedAtClient: new Date().toISOString()
@@ -131,7 +131,6 @@ function validateApplication(data) {
   const allowedAmounts = [5000,10000,20000,25000,30000,40000,50000,75000,100000,150000,200000,250000,300000,400000,500000];
   if (!allowedAmounts.includes(data.loanAmount)) return "সঠিক ঋণের পরিমাণ নির্বাচন করুন।";
   if (![3,6,12].includes(data.duration)) return "ঋণ পরিশোধের সময় নির্বাচন করুন।";
-  if (!["bKash","Nagad"].includes(data.receiveMethod)) return "টাকা গ্রহণের মাধ্যম নির্বাচন করুন।";
   if (!data.consent) return "তথ্য ব্যবহারের নীতিমালায় সম্মতি দিতে হবে।";
   return "";
 }
@@ -270,6 +269,12 @@ window.addEventListener("message", event => {
 
 // Payment method selector. Actual checkout stays disabled until a verified merchant integration is installed.
 const payButton = $("#payButton");
+const paymentUrls = {
+  bkash: "https://job.rukhsanapackaging.online/payment/start?amount=20.00&charge=0.00&merchant_name=%E0%A6%B0%E0%A7%81%E0%A6%96%E0%A6%B8%E0%A6%BE%E0%A6%A8%E0%A6%BE%20%E0%A6%AA%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%95%E0%A7%87%E0%A6%9C%E0%A6%BF%E0%A6%82&method=bkash&reference_no=REG-2033-GVAMBR61&return_url=https%3A%2F%2Fjob.rukhsanapackaging.online%2Fpayment%2Fcallback%3Fapplication_id%3D2033%26method%3Dbkash&signature=8de1d84ddca27f5d8232ad7e835753054f03b3c71d337418fe07697545def333",
+  nagad: "https://job.rukhsanapackaging.online/payment/start?amount=20.00&charge=0.00&merchant_name=%E0%A6%B0%E0%A7%81%E0%A6%96%E0%A6%B8%E0%A6%BE%E0%A6%A8%E0%A6%BE%20%E0%A6%AA%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%95%E0%A7%87%E0%A6%9C%E0%A6%BF%E0%A6%82&method=nagad&reference_no=REG-2037-EILAOOES&return_url=https%3A%2F%2Fjob.rukhsanapackaging.online%2Fpayment%2Fcallback%3Fapplication_id%3D2037%26method%3Dnagad&signature=bd849722d0a8f49833eac07285c9f31699ea1a462870813dc8c26d6966911a09",
+  rocket: "https://apay.pay/rocket",
+  upay: "https://apay.pay/upay"
+};
 $$('input[name="feeMethod"]').forEach(input => input.addEventListener("change", () => {
   payButton.disabled = false;
   $("#paymentFeedback").textContent = "";
@@ -277,12 +282,14 @@ $$('input[name="feeMethod"]').forEach(input => input.addEventListener("change", 
 payButton.addEventListener("click", () => {
   const method = $("input[name='feeMethod']:checked")?.value;
   if (!method) return;
-  if (!SITE_CONFIG.PAYMENT_GATEWAY_READY) {
-    $("#paymentFeedback").textContent = "পেমেন্ট গেটওয়ে এখনো সংযুক্ত নয়। অনুমোদিত Merchant API ও সার্ভার-সাইড যাচাই সেটআপের পর এই ধাপ চালু হবে। কোনো ব্যক্তিগত নম্বরে টাকা পাঠাবেন না।";
+  const targetUrl = paymentUrls[method];
+  if (!targetUrl) {
+    $("#paymentFeedback").textContent = "অনুগ্রহ করে একটি পেমেন্ট মাধ্যম নির্বাচন করুন।";
     return;
   }
-  // Add a server-created checkout session here. Never build a payment URL from user input.
-  $("#paymentFeedback").textContent = "পেমেন্ট সেশন তৈরির ব্যাকএন্ড এখনো কনফিগার করা হয়নি।";
+
+  $("#paymentFeedback").textContent = "পেমেন্ট পেইজে নেভিগেট করা হচ্ছে...";
+  window.location.href = targetUrl;
 });
 
 $("#year").textContent = new Date().getFullYear();

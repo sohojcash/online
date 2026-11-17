@@ -168,14 +168,6 @@
             </div>
           </div>
 
-          <div class="form-section">
-            <div class="form-section-title"><span class="form-number">৪</span><div><h3>টাকা গ্রহণের অ্যাকাউন্ট</h3><p>ঋণ অনুমোদিত হলে কোন মাধ্যমে টাকা নিতে চান তা জানান।</p></div></div>
-            <div class="choice-grid receive-choices">
-              <label class="wallet-choice wallet-bkash"><input type="radio" name="receiveMethod" value="bKash" required><span class="wallet-logo">bKash</span><span>বিকাশ</span></label>
-              <label class="wallet-choice wallet-nagad"><input type="radio" name="receiveMethod" value="Nagad"><span class="wallet-logo">নগদ</span><span>নগদ</span></label>
-            </div>
-          </div>
-
           <div class="consent-box">
             <label class="consent-label"><input type="checkbox" name="consent" required checked><span>আমি <button type="button" class="inline-link" data-open-policy>তথ্য ব্যবহারের নীতিমালা</button> পড়েছি এবং আমার দেওয়া তথ্য আবেদন যাচাই ও যোগাযোগের জন্য ব্যবহারে সম্মতি দিচ্ছি। <i>*</i></span></label>
             <p>আপনার সম্মতি ছাড়া ফরম জমা হবে না। NID নম্বর ঐচ্ছিক; প্রয়োজন না হলে দেবেন না।</p>
@@ -237,14 +229,14 @@
       <h2 id="paymentTitle">আবেদন জমা হয়েছে</h2>
       <p class="application-ref" id="applicationRef"></p>
       <div class="fee-notice"><strong>আবেদন ফি জমা দিন</strong><b>৳ ২০</b><small>ফি প্রযোজ্য হলে পেমেন্টের আগে পরিমাণ ও শর্ত যাচাই করুন।</small></div>
-      <p class="payment-instruction">পেমেন্টের মাধ্যম নির্বাচন করুন। প্রকৃত পেমেন্ট গেটওয়ে যুক্ত না হওয়া পর্যন্ত টাকা পাঠানোর ব্যবস্থা চালু হবে না।</p>
+      <p class="payment-instruction">বিকাশ বা নগদ যেকোন একটি সিলেক্ট করার পর “টাকা পাঠান” বাটনে চাপ দিন।</p>
       <div class="payment-method-grid">
-        <label class="payment-method p-bkash"><input type="radio" name="feeMethod" value="bkash"><span class="pay-brand">bKash</span><span>বিকাশ</span></label>
-        <label class="payment-method p-nagad"><input type="radio" name="feeMethod" value="nagad"><span class="pay-brand">নগদ</span><span>নগদ</span></label>
-        <label class="payment-method p-rocket"><input type="radio" name="feeMethod" value="rocket"><span class="pay-brand">Rocket</span><span>রকেট</span></label>
-        <label class="payment-method p-upay"><input type="radio" name="feeMethod" value="upay"><span class="pay-brand">upay</span><span>উপায়</span></label>
+        <label class="payment-method p-bkash"><input type="radio" name="feeMethod" value="bkash"><img class="pay-brand" src="assets/bkash.jfif" alt="bKash" /><span class="pay-label">বিকাশ</span></label>
+        <label class="payment-method p-nagad"><input type="radio" name="feeMethod" value="nagad"><img class="pay-brand" src="assets/Nagad.webp" alt="Nagad" /><span class="pay-label">নগদ</span></label>
+        <label class="payment-method p-rocket"><input type="radio" name="feeMethod" value="rocket"><img class="pay-brand" src="assets/Rocket.webp" alt="Rocket" /><span class="pay-label">রকেট</span></label>
+        <label class="payment-method p-upay"><input type="radio" name="feeMethod" value="upay"><img class="pay-brand" src="assets/Upay.png" alt="upay" /><span class="pay-label">উপায়</span></label>
       </div>
-      <button class="btn btn-primary btn-block" id="payButton" type="button" disabled>টাকা পাঠান</button>
+      <button class="btn btn-primary btn-block payment-action-btn" id="payButton" type="button" disabled>টাকা পাঠান</button>
       <div class="payment-feedback" id="paymentFeedback" role="status" aria-live="polite"></div>
       <p class="tiny-note">কোনো পেমেন্ট সম্পন্ন হয়েছে বলে এই পেজে দেখানো হবে না; গেটওয়ের সার্ভার-সাইড যাচাই যুক্ত হওয়ার পরই পেমেন্ট নিশ্চিত করা যাবে।</p>
     </div>

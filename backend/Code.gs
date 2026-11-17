@@ -18,7 +18,7 @@ const HEADERS = [
   'Submitted At', 'Application ID', 'Applicant Name', 'Father Name', 'Mother Name',
   'Date of Birth', 'NID (Optional)', 'Division', 'District', 'Thana / Upazila',
   'Road / Village / Area', 'Applicant Phone', 'Loan Type', 'Loan Amount (BDT)',
-  'Repayment Months', 'Receive Method', 'Receive Account', 'Consent',
+  'Repayment Months', 'Consent',
   'Consent Timestamp', 'Application Status', 'Fee Payment Status', 'Request ID'
 ];
 
@@ -77,8 +77,6 @@ function doPost(e) {
         safeCell_(data.loanType),
         Number(data.loanAmount),
         Number(data.duration),
-        safeCell_(data.receiveMethod),
-        safeCell_(data.receiveNumber),
         'Yes',
         now,
         'Pending review',
@@ -97,7 +95,7 @@ function doPost(e) {
       // Keep applicant-supplied strings and the request ID as text.
       ['Applicant Name','Father Name','Mother Name','Date of Birth','NID (Optional)',
        'Division','District','Thana / Upazila','Road / Village / Area','Applicant Phone',
-       'Loan Type','Receive Method','Receive Account','Request ID'].forEach(header => {
+       'Loan Type','Request ID'].forEach(header => {
         const column = headerRow.indexOf(header) + 1;
         if (column > 0) sheet.getRange(nextRow, column).setNumberFormat('@');
       });
@@ -202,17 +200,15 @@ function jsonpStatus_(requestId, callbackName) {
 function validateApplication_(data) {
   if (!data || typeof data !== 'object') throw new Error('Invalid data');
   if (String(data.website || '').trim()) throw new Error('Bot detected');
-  const requiredText = ['name', 'fatherName', 'motherName', 'phone', 'loanType', 'receiveMethod', 'receiveNumber'];
+  const requiredText = ['name', 'fatherName', 'motherName', 'phone', 'loanType'];
   requiredText.forEach(key => {
     if (!String(data[key] || '').trim()) throw new Error('Missing required field: ' + key);
   });
   if (!/^01[3-9]\d{8}$/.test(String(data.phone))) throw new Error('Invalid phone');
-  if (!/^01[3-9]\d{8}$/.test(String(data.receiveNumber))) throw new Error('Invalid receive account');
   const amounts = [5000,10000,20000,25000,30000,40000,50000,75000,100000,150000,200000,250000,300000,400000,500000];
   if (!amounts.includes(Number(data.loanAmount))) throw new Error('Invalid loan amount');
   if (![3,6,12].includes(Number(data.duration))) throw new Error('Invalid duration');
   if (!['ব্যক্তিগত ঋণ','শিক্ষা সহায়তা ঋণ','নতুন উদ্যোক্তা ঋণ','কৃষি ঋণ'].includes(String(data.loanType))) throw new Error('Invalid loan type');
-  if (!['bKash','Nagad'].includes(String(data.receiveMethod))) throw new Error('Invalid receive method');
   if (data.consent !== true) throw new Error('Consent missing');
   if (String(data.name).length > 100 || String(data.fatherName).length > 100 || String(data.motherName).length > 100) throw new Error('Name too long');
 }
@@ -241,7 +237,6 @@ function sendAdminAlert_(data, applicationId) {
       'ঋণের ধরন: ' + data.loanType,
       'পরিমাণ: ' + data.loanAmount + ' টাকা',
       'মেয়াদ: ' + data.duration + ' মাস',
-      'টাকা গ্রহণ: ' + data.receiveMethod + ' / ' + data.receiveNumber,
       '',
       'সম্পূর্ণ আবেদন দেখতে ব্যক্তিগত Google Sheet খুলুন।'
     ].join('\n');

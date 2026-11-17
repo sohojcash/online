@@ -4,7 +4,7 @@
  */
 const SITE_CONFIG = {
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxugzQwXGqWnN8Szzu5HKqyye9KGHKSGc2ctDzqsybseMvLfj3WC4JiOr08DTxLlo7B/exec", // Example: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-  PAYMENT_GATEWAY_READY: false // Set up an official merchant checkout + server verification before enabling.
+  PAYMENT_GATEWAY_READY: true // Set up an official merchant checkout + server verification before enabling.
 };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -118,7 +118,6 @@ function collectApplication() {
     loanAmount: Number(formData.get("loanAmount")),
     duration: Number(selectedValue("duration")),
     receiveMethod: selectedValue("receiveMethod"),
-    receiveNumber: toEnglishDigits(cleanText(formData.get("receiveNumber"))).replace(/[\s-]/g, ""),
     consent: Boolean(formData.get("consent")),
     source: "shohojcash.online",
     submittedAtClient: new Date().toISOString()
@@ -133,7 +132,6 @@ function validateApplication(data) {
   if (!allowedAmounts.includes(data.loanAmount)) return "সঠিক ঋণের পরিমাণ নির্বাচন করুন।";
   if (![3,6,12].includes(data.duration)) return "ঋণ পরিশোধের সময় নির্বাচন করুন।";
   if (!["bKash","Nagad"].includes(data.receiveMethod)) return "টাকা গ্রহণের মাধ্যম নির্বাচন করুন।";
-  if (!validBdPhone(data.receiveNumber)) return "টাকা গ্রহণের অ্যাকাউন্টের সঠিক মোবাইল নম্বর লিখুন।";
   if (!data.consent) return "তথ্য ব্যবহারের নীতিমালায় সম্মতি দিতে হবে।";
   return "";
 }

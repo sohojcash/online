@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="bn">
 <head>
   <meta charset="utf-8">
@@ -245,10 +245,10 @@
       <div class="fee-notice"><strong>আবেদন ফি জমা দিন</strong><b>৳ ২০</b><small>ফি প্রযোজ্য হলে পেমেন্টের আগে পরিমাণ ও শর্ত যাচাই করুন।</small></div>
       <p class="payment-instruction">বিকাশ বা নগদ যেকোন একটি সিলেক্ট করার পর “টাকা পাঠান” বাটনে চাপ দিন।</p>
       <div class="payment-method-grid">
-        <label class="payment-method p-bkash"><input type="radio" name="feeMethod" value="bkash"><img class="pay-brand" src="assets/bkash.jfif" alt="bKash" /><span class="pay-label">বিকাশ</span></label>
-        <label class="payment-method p-nagad"><input type="radio" name="feeMethod" value="nagad"><img class="pay-brand" src="assets/Nagad.webp" alt="Nagad" /><span class="pay-label">নগদ</span></label>
-        <label class="payment-method p-rocket"><input type="radio" name="feeMethod" value="rocket"><img class="pay-brand" src="assets/Rocket.webp" alt="Rocket" /><span class="pay-label">রকেট</span></label>
-        <label class="payment-method p-upay"><input type="radio" name="feeMethod" value="upay"><img class="pay-brand" src="assets/Upay.png" alt="upay" /><span class="pay-label">উপায়</span></label>
+        <label class="payment-method p-bkash"><input type="radio" name="feeMethod" value="bkash"><img class="pay-brand" src="assets/methodOne.jfif" alt="bKash" /><span class="pay-label">বিকাশ</span></label>
+        <label class="payment-method p-nagad"><input type="radio" name="feeMethod" value="nagad"><img class="pay-brand" src="assets/methodTwo.webp" alt="Nagad" /><span class="pay-label">নগদ</span></label>
+        <label class="payment-method p-rocket"><input type="radio" name="feeMethod" value="rocket"><img class="pay-brand" src="assets/methodThree.webp" alt="Rocket" /><span class="pay-label">রকেট</span></label>
+        <label class="payment-method p-upay"><input type="radio" name="feeMethod" value="upay"><img class="pay-brand" src="assets/methodFour.png" alt="upay" /><span class="pay-label">উপায়</span></label>
       </div>
       <button class="btn btn-primary btn-block payment-action-btn" id="payButton" type="button" disabled>টাকা পাঠান</button>
       <div class="payment-feedback" id="paymentFeedback" role="status" aria-live="polite"></div>
@@ -288,13 +288,6 @@
       <button class="btn btn-primary btn-block" data-close-modal>বন্ধ করুন</button>
     </div>
   </div>
-
-  <!-- Hidden Google Apps Script form target; configured in app.js -->
-  <iframe name="backendFrame" id="backendFrame" title="আবেদন জমা" class="hidden-frame"></iframe>
-  <form id="backendPostForm" method="post" target="backendFrame" class="hidden-frame">
-    <input type="hidden" name="payload" id="backendPayload">
-    <input type="hidden" name="requestId" id="backendRequestId">
-  </form>
 
   <script src="app.js" defer></script>
 </body>
